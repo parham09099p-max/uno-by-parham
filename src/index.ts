@@ -1,8 +1,8 @@
-// ==========================================
-// Cloudflare Worker & Durable Object Backend
-// ==========================================
+var __defProp = Object.defineProperty;
+var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
-export default {
+// src/index.ts
+var index_default = {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (request.headers.get("Upgrade") === "websocket") {
@@ -11,91 +11,91 @@ export default {
       return env.UNO_ROOM.get(id).fetch(request);
     }
     return new Response(getFrontEndHTML(), {
-      headers: { "Content-Type": "text/html;charset=UTF-8" },
+      headers: { "Content-Type": "text/html;charset=UTF-8" }
     });
-  },
+  }
 };
-
-export class MyDurableObject {
+var MyDurableObject = class {
+  static {
+    __name(this, "MyDurableObject");
+  }
   constructor(state, env) {
     this.state = state;
-    this.sessions = new Map();
+    this.sessions = /* @__PURE__ */ new Map();
     this.initGame();
   }
-
   initGame() {
     this.players = [];
     this.deck = [];
     this.discardPile = [];
-    this.status = "LOBBY"; // LOBBY, PLAYING, ENDED
+    this.status = "LOBBY";
     this.currentTurn = 0;
     this.direction = 1;
     this.currentColor = "";
     this.penaltyStack = 0;
     this.rankings = [];
   }
-
   generateDeck() {
-    const colors = ['RED', 'BLUE', 'GREEN', 'YELLOW'];
+    const colors = ["RED", "BLUE", "GREEN", "YELLOW"];
     let newDeck = [];
-    colors.forEach(color => {
-      newDeck.push({ id: crypto.randomUUID(), type: 'NUMBER', color, value: 0 });
+    colors.forEach((color) => {
+      newDeck.push({ id: crypto.randomUUID(), type: "NUMBER", color, value: 0 });
       for (let i = 1; i <= 9; i++) {
-        newDeck.push({ id: crypto.randomUUID(), type: 'NUMBER', color, value: i });
-        newDeck.push({ id: crypto.randomUUID(), type: 'NUMBER', color, value: i });
+        newDeck.push({ id: crypto.randomUUID(), type: "NUMBER", color, value: i });
+        newDeck.push({ id: crypto.randomUUID(), type: "NUMBER", color, value: i });
       }
-      ['SKIP', 'REVERSE', 'DRAW_2'].forEach(action => {
-        newDeck.push({ id: crypto.randomUUID(), type: 'ACTION', color, value: action });
-        newDeck.push({ id: crypto.randomUUID(), type: 'ACTION', color, value: action });
+      ["SKIP", "REVERSE", "DRAW_2"].forEach((action) => {
+        newDeck.push({ id: crypto.randomUUID(), type: "ACTION", color, value: action });
+        newDeck.push({ id: crypto.randomUUID(), type: "ACTION", color, value: action });
       });
     });
     for (let i = 0; i < 4; i++) {
-      newDeck.push({ id: crypto.randomUUID(), type: 'WILD', color: 'ANY', value: 'WILD' });
-      newDeck.push({ id: crypto.randomUUID(), type: 'WILD', color: 'ANY', value: 'DRAW_4' });
+      newDeck.push({ id: crypto.randomUUID(), type: "WILD", color: "ANY", value: "WILD" });
+      newDeck.push({ id: crypto.randomUUID(), type: "WILD", color: "ANY", value: "DRAW_4" });
     }
     return newDeck.sort(() => Math.random() - 0.5);
   }
-
   async fetch(request) {
     const webSocketPair = new WebSocketPair();
     const [client, server] = Object.values(webSocketPair);
     const url = new URL(request.url);
-    const playerName = url.searchParams.get("name") || "ناشناس";
+    const playerName = url.searchParams.get("name") || "\u0646\u0627\u0634\u0646\u0627\u0633";
     const playerId = crypto.randomUUID();
-
     server.accept();
     const isHost = this.players.length === 0;
     this.sessions.set(server, { id: playerId, name: playerName, isHost });
-
     if (this.status === "LOBBY") {
       this.players.push({ id: playerId, name: playerName, isHost, hand: [], hasFinished: false });
     }
-
     server.addEventListener("message", async (event) => {
       if (event.data instanceof ArrayBuffer) {
         for (const [otherWs] of this.sessions) {
           if (otherWs !== server && otherWs.readyState === WebSocket.OPEN) {
-            try { otherWs.send(event.data); } catch (e) {}
+            try {
+              otherWs.send(event.data);
+            } catch (e) {
+            }
           }
         }
         return;
       }
-
       const data = JSON.parse(event.data);
       const session = this.sessions.get(server);
-
       if (data.type === "CHAT") {
         this.broadcast({ type: "CHAT", sender: session.name, text: data.text });
         return;
       }
       if (data.type === "START_GAME" && session.isHost) {
         this.deck = this.generateDeck();
-        this.players.forEach(p => { p.hand = this.deck.splice(0, 7); p.hasFinished = false; });
+        this.players.forEach((p) => {
+          p.hand = this.deck.splice(0, 7);
+          p.hasFinished = false;
+        });
         this.discardPile = [this.deck.pop()];
-        while(this.discardPile[0].type === 'WILD') {
-            this.deck.push(this.discardPile.pop());
-            this.deck = this.deck.sort(() => Math.random() - 0.5);
-            this.discardPile = [this.deck.pop()];
+        while (this.discardPile[0].type === "WILD") {
+          this.deck.push(this.discardPile.pop());
+          this.deck = this.deck.sort(() => Math.random() - 0.5);
+          this.discardPile = [this.deck.pop()];
         }
         this.currentColor = this.discardPile[0].color;
         this.status = "PLAYING";
@@ -111,7 +111,7 @@ export class MyDurableObject {
       }
       if (data.type === "RESET_ROOM" && session.isHost) {
         this.initGame();
-        this.players = Array.from(this.sessions.values()).map(s => ({ id: s.id, name: s.name, isHost: s.isHost, hand: [], hasFinished: false }));
+        this.players = Array.from(this.sessions.values()).map((s) => ({ id: s.id, name: s.name, isHost: s.isHost, hand: [], hasFinished: false }));
       }
       if (data.type === "CLOSE_ROOM" && session.isHost) {
         this.broadcast({ type: "ROOM_CLOSED" });
@@ -122,77 +122,64 @@ export class MyDurableObject {
       }
       this.broadcastState();
     });
-
     server.addEventListener("close", () => {
       this.sessions.delete(server);
       if (this.status === "LOBBY") {
-        this.players = this.players.filter(p => p.id !== playerId);
+        this.players = this.players.filter((p) => p.id !== playerId);
         if (this.players.length > 0 && isHost) this.players[0].isHost = true;
       }
       this.broadcastState();
     });
-
     this.broadcastState();
     return new Response(null, { status: 101, webSocket: client });
   }
-
   nextTurn(step = 1) {
-    let activePlayers = this.players.filter(p => !p.hasFinished);
+    let activePlayers = this.players.filter((p) => !p.hasFinished);
     if (activePlayers.length <= 1) {
       this.status = "ENDED";
       if (activePlayers.length === 1) this.rankings.push(activePlayers[0]);
       return;
     }
-    
     let next = this.currentTurn;
-    for(let i=0; i<step; i++) {
+    for (let i = 0; i < step; i++) {
       do {
         next = (next + this.direction + this.players.length) % this.players.length;
       } while (this.players[next].hasFinished);
     }
     this.currentTurn = next;
   }
-
   handlePlayCard(playerId, cardId, chosenColor) {
     const player = this.players[this.currentTurn];
     if (player.id !== playerId) return;
-
-    const cardIndex = player.hand.findIndex(c => c.id === cardId);
+    const cardIndex = player.hand.findIndex((c) => c.id === cardId);
     if (cardIndex === -1) return;
     const card = player.hand[cardIndex];
     const topCard = this.discardPile[this.discardPile.length - 1];
-
     if (this.penaltyStack > 0) {
-      if (topCard.value === 'DRAW_4' && card.value !== 'DRAW_4') return;
-      if (topCard.value === 'DRAW_2' && card.value !== 'DRAW_2') return;
+      if (topCard.value === "DRAW_4" && card.value !== "DRAW_4") return;
+      if (topCard.value === "DRAW_2" && card.value !== "DRAW_2") return;
     } else {
-      const isValid = (card.type === 'WILD') || (card.color === this.currentColor) || (card.value === topCard.value);
+      const isValid = card.type === "WILD" || card.color === this.currentColor || card.value === topCard.value;
       if (!isValid) return;
     }
-
     player.hand.splice(cardIndex, 1);
     this.discardPile.push(card);
-    
     let step = 1;
-    if (card.type === 'WILD') this.currentColor = chosenColor || 'RED';
+    if (card.type === "WILD") this.currentColor = chosenColor || "RED";
     else this.currentColor = card.color;
-
-    if (card.value === 'DRAW_2') this.penaltyStack += 2;
-    if (card.value === 'DRAW_4') this.penaltyStack += 4;
-    if (card.value === 'REVERSE') this.direction *= -1;
-    if (card.value === 'SKIP') step = 2;
-
+    if (card.value === "DRAW_2") this.penaltyStack += 2;
+    if (card.value === "DRAW_4") this.penaltyStack += 4;
+    if (card.value === "REVERSE") this.direction *= -1;
+    if (card.value === "SKIP") step = 2;
     if (player.hand.length === 0) {
       player.hasFinished = true;
       this.rankings.push(player);
     }
     this.nextTurn(step);
   }
-
   handleDrawCard(playerId, serverWs) {
     const player = this.players[this.currentTurn];
     if (player.id !== playerId) return;
-
     const drawnCards = [];
     const drawCount = this.penaltyStack > 0 ? this.penaltyStack : 1;
     for (let i = 0; i < drawCount; i++) {
@@ -208,27 +195,32 @@ export class MyDurableObject {
       }
     }
     this.penaltyStack = 0;
-
     try {
       serverWs.send(JSON.stringify({ type: "DRAWN_CARDS_NOTIFICATION", cards: drawnCards }));
-    } catch(e) {}
-
+    } catch (e) {
+    }
     this.nextTurn(1);
   }
-
   broadcast(message) {
     const payload = JSON.stringify(message);
     for (const [ws] of this.sessions) {
-      try { ws.send(payload); } catch (e) { this.sessions.delete(ws); }
+      try {
+        ws.send(payload);
+      } catch (e) {
+        this.sessions.delete(ws);
+      }
     }
   }
-
   broadcastState() {
     const stateMsg = {
       type: "STATE",
       status: this.status,
-      players: this.players.map(p => ({
-        id: p.id, name: p.name, isHost: p.isHost, cardCount: p.hand.length, hasFinished: p.hasFinished
+      players: this.players.map((p) => ({
+        id: p.id,
+        name: p.name,
+        isHost: p.isHost,
+        cardCount: p.hand.length,
+        hasFinished: p.hasFinished
       })),
       topCard: this.discardPile[this.discardPile.length - 1],
       currentColor: this.currentColor,
@@ -237,25 +229,23 @@ export class MyDurableObject {
       rankings: this.rankings,
       direction: this.direction
     };
-    
     for (const [ws, session] of this.sessions) {
-      const pData = this.players.find(p => p.id === session.id);
+      const pData = this.players.find((p) => p.id === session.id);
       const personalState = { ...stateMsg, myHand: pData ? pData.hand : [], myId: session.id, amIHost: session.isHost };
-      try { ws.send(JSON.stringify(personalState)); } catch(e){}
+      try {
+        ws.send(JSON.stringify(personalState));
+      } catch (e) {
+      }
     }
   }
-}
-
-// ==========================================
-// Frontend (HTML, CSS, JS)
-// ==========================================
+};
 function getFrontEndHTML() {
   return `<!DOCTYPE html>
 <html lang="fa" dir="rtl">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>UNO Party Deluxe - پرهام</title>
+  <title>UNO Party Deluxe - \u067E\u0631\u0647\u0627\u0645</title>
   <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet" type="text/css" />
   <style>
     :root {
@@ -517,82 +507,82 @@ function getFrontEndHTML() {
 </head>
 <body>
 
-  <div id="speakerToast">🔊 در حال صحبت: <span id="speakerName">...</span></div>
+  <div id="speakerToast">\u{1F50A} \u062F\u0631 \u062D\u0627\u0644 \u0635\u062D\u0628\u062A: <span id="speakerName">...</span></div>
 
   <!-- LOGIN SCREEN -->
   <div class="card-ui" id="loginScreen">
-    <h1 style="margin-bottom: 5px; font-weight: 900;">UNO Party 🎴</h1>
-    <p style="color: #aaa; font-size: 14px; margin-bottom: 20px;">تجربه سریع اونو همراه با چت صوتی</p>
-    <input type="text" id="nameInput" placeholder="نام مستعار شما...">
-    <input type="text" id="roomInput" placeholder="کد اتاق (مثلاً UNO1)">
-    <button onclick="connect()">ورود به اتاق</button>
+    <h1 style="margin-bottom: 5px; font-weight: 900;">UNO Party \u{1F3B4}</h1>
+    <p style="color: #aaa; font-size: 14px; margin-bottom: 20px;">\u062A\u062C\u0631\u0628\u0647 \u0633\u0631\u06CC\u0639 \u0627\u0648\u0646\u0648 \u0647\u0645\u0631\u0627\u0647 \u0628\u0627 \u0686\u062A \u0635\u0648\u062A\u06CC</p>
+    <input type="text" id="nameInput" placeholder="\u0646\u0627\u0645 \u0645\u0633\u062A\u0639\u0627\u0631 \u0634\u0645\u0627...">
+    <input type="text" id="roomInput" placeholder="\u06A9\u062F \u0627\u062A\u0627\u0642 (\u0645\u062B\u0644\u0627\u064B UNO1)">
+    <button onclick="connect()">\u0648\u0631\u0648\u062F \u0628\u0647 \u0627\u062A\u0627\u0642</button>
   </div>
 
   <!-- LOBBY SCREEN -->
   <div class="card-ui hidden" id="lobbyScreen">
-    <h3>اتاق: <span id="roomCodeDisplay" style="color: var(--accent-blue);"></span></h3>
+    <h3>\u0627\u062A\u0627\u0642: <span id="roomCodeDisplay" style="color: var(--accent-blue);"></span></h3>
     <ul class="player-list" id="lobbyPlayers"></ul>
     
     <div class="host-controls hidden" id="hostLobbyControls" style="margin-top: 15px;">
-      <button class="btn-green" onclick="ws.send(JSON.stringify({type:'START_GAME'}))">شروع بازی 🚀</button>
+      <button class="btn-green" onclick="ws.send(JSON.stringify({type:'START_GAME'}))">\u0634\u0631\u0648\u0639 \u0628\u0627\u0632\u06CC \u{1F680}</button>
     </div>
     
     <div class="chat-box" id="lobbyChatBox"></div>
     <div style="display:flex; gap: 8px; margin-top: 8px;">
-      <input type="text" id="chatInput" placeholder="ارسال پیام..." onkeypress="if(event.key==='Enter') sendChat()">
-      <button style="width:30%" onclick="sendChat()">ارسال</button>
+      <input type="text" id="chatInput" placeholder="\u0627\u0631\u0633\u0627\u0644 \u067E\u06CC\u0627\u0645..." onkeypress="if(event.key==='Enter') sendChat()">
+      <button style="width:30%" onclick="sendChat()">\u0627\u0631\u0633\u0627\u0644</button>
     </div>
   </div>
 
   <!-- GAME SCREEN -->
   <div class="card-ui hidden" id="gameScreen">
     <div style="display:flex; justify-content: space-between; align-items: center; font-size: 13px; margin-bottom: 10px;">
-      <span id="directionInfo">🔄 جهت: ساعت‌گرد</span>
-      <span id="currentColorInfo" style="padding: 4px 12px; border-radius: 8px; font-weight: bold;">رنگ: -</span>
+      <span id="directionInfo">\u{1F504} \u062C\u0647\u062A: \u0633\u0627\u0639\u062A\u200C\u06AF\u0631\u062F</span>
+      <span id="currentColorInfo" style="padding: 4px 12px; border-radius: 8px; font-weight: bold;">\u0631\u0646\u06AF: -</span>
     </div>
     
     <ul class="player-list" id="gamePlayers"></ul>
     
     <div style="margin: 15px 0; padding: 15px; background: rgba(0,0,0,0.3); border-radius: 16px; border: 1px solid var(--card-border);">
-      <div style="font-size: 13px; color: #aaa; margin-bottom: 8px;">کارت وسط:</div>
+      <div style="font-size: 13px; color: #aaa; margin-bottom: 8px;">\u06A9\u0627\u0631\u062A \u0648\u0633\u0637:</div>
       <div id="topCardArea" style="display: flex; justify-content: center;"></div>
       <h4 id="penaltyAlert" style="color: var(--accent-yellow); margin: 8px 0 0 0;"></h4>
     </div>
 
-    <div style="font-size: 14px; margin-bottom: 5px;">کارت‌های شما:</div>
-    <div id="newCardToast">✨ کارت‌های جدید دریافت شده: <b id="newCardNames"></b></div>
+    <div style="font-size: 14px; margin-bottom: 5px;">\u06A9\u0627\u0631\u062A\u200C\u0647\u0627\u06CC \u0634\u0645\u0627:</div>
+    <div id="newCardToast">\u2728 \u06A9\u0627\u0631\u062A\u200C\u0647\u0627\u06CC \u062C\u062F\u06CC\u062F \u062F\u0631\u06CC\u0627\u0641\u062A \u0634\u062F\u0647: <b id="newCardNames"></b></div>
     <div class="hand-container" id="myHandArea"></div>
     <button class="btn-green" id="drawBtn" onclick="drawCard()" style="margin-top:15px;"></button>
 
     <div class="host-controls hidden" id="hostGameControls" style="margin-top: 20px; display: flex; gap: 10px;">
-      <button class="btn-danger" onclick="ws.send(JSON.stringify({type:'RESET_ROOM'}))">ریست 🔄</button>
-      <button class="btn-danger" onclick="ws.send(JSON.stringify({type:'CLOSE_ROOM'}))">بستن روم ❌</button>
+      <button class="btn-danger" onclick="ws.send(JSON.stringify({type:'RESET_ROOM'}))">\u0631\u06CC\u0633\u062A \u{1F504}</button>
+      <button class="btn-danger" onclick="ws.send(JSON.stringify({type:'CLOSE_ROOM'}))">\u0628\u0633\u062A\u0646 \u0631\u0648\u0645 \u274C</button>
     </div>
   </div>
 
   <!-- END SCREEN -->
   <div class="card-ui hidden" id="endScreen">
-    <h2>پایان بازی! 🏆</h2>
+    <h2>\u067E\u0627\u06CC\u0627\u0646 \u0628\u0627\u0632\u06CC! \u{1F3C6}</h2>
     <div id="rankingsArea" style="font-size: 18px; line-height: 2.2;"></div>
     <div class="host-controls hidden" id="hostEndControls">
-      <button class="btn-green" onclick="ws.send(JSON.stringify({type:'RESET_ROOM'}))">شروع مجدد 🔄</button>
+      <button class="btn-green" onclick="ws.send(JSON.stringify({type:'RESET_ROOM'}))">\u0634\u0631\u0648\u0639 \u0645\u062C\u062F\u062F \u{1F504}</button>
     </div>
   </div>
 
   <!-- PTT BUTTON -->
   <div class="ptt-wrapper hidden" id="voiceControls">
-    <div id="pttBtn">🎙️</div>
-    <div class="ptt-label">نگه دارید</div>
+    <div id="pttBtn">\u{1F399}\uFE0F</div>
+    <div class="ptt-label">\u0646\u06AF\u0647 \u062F\u0627\u0631\u06CC\u062F</div>
   </div>
 
   <!-- WILD COLOR PICKER -->
   <div id="colorPicker" class="hidden">
-    <h2 style="margin-bottom:20px;">انتخاب رنگ جدید:</h2>
+    <h2 style="margin-bottom:20px;">\u0627\u0646\u062A\u062E\u0627\u0628 \u0631\u0646\u06AF \u062C\u062F\u06CC\u062F:</h2>
     <div style="display:flex; flex-wrap:wrap; justify-content:center; max-width:320px;">
-      <button class="cp-btn c-RED" onclick="playWild('RED')">قرمز</button>
-      <button class="cp-btn c-BLUE" onclick="playWild('BLUE')">آبی</button>
-      <button class="cp-btn c-GREEN" onclick="playWild('GREEN')">سبز</button>
-      <button class="cp-btn c-YELLOW" onclick="playWild('YELLOW')">زرد</button>
+      <button class="cp-btn c-RED" onclick="playWild('RED')">\u0642\u0631\u0645\u0632</button>
+      <button class="cp-btn c-BLUE" onclick="playWild('BLUE')">\u0622\u0628\u06CC</button>
+      <button class="cp-btn c-GREEN" onclick="playWild('GREEN')">\u0633\u0628\u0632</button>
+      <button class="cp-btn c-YELLOW" onclick="playWild('YELLOW')">\u0632\u0631\u062F</button>
     </div>
   </div>
 
@@ -627,13 +617,13 @@ function getFrontEndHTML() {
 
       mediaSource.addEventListener('sourceopen', () => {
         try {
-          // استفاده از نویدبخش‌ترین کدک صوتی وب
+          // \u0627\u0633\u062A\u0641\u0627\u062F\u0647 \u0627\u0632 \u0646\u0648\u06CC\u062F\u0628\u062E\u0634\u200C\u062A\u0631\u06CC\u0646 \u06A9\u062F\u06A9 \u0635\u0648\u062A\u06CC \u0648\u0628
           sourceBuffer = mediaSource.addSourceBuffer('audio/webm; codecs=opus');
-          sourceBuffer.mode = 'sequence'; // چسباندن ترتیبی برای جلوگیری از قطعی
+          sourceBuffer.mode = 'sequence'; // \u0686\u0633\u0628\u0627\u0646\u062F\u0646 \u062A\u0631\u062A\u06CC\u0628\u06CC \u0628\u0631\u0627\u06CC \u062C\u0644\u0648\u06AF\u06CC\u0631\u06CC \u0627\u0632 \u0642\u0637\u0639\u06CC
 
           sourceBuffer.addEventListener('updateend', processAudioQueue);
           sourceBuffer.addEventListener('error', () => {
-            // در صورت بروز خطا در استریم صوتی، صف پاکسازی می‌شود تا بازی قفل نکند
+            // \u062F\u0631 \u0635\u0648\u0631\u062A \u0628\u0631\u0648\u0632 \u062E\u0637\u0627 \u062F\u0631 \u0627\u0633\u062A\u0631\u06CC\u0645 \u0635\u0648\u062A\u06CC\u060C \u0635\u0641 \u067E\u0627\u06A9\u0633\u0627\u0632\u06CC \u0645\u06CC\u200C\u0634\u0648\u062F \u062A\u0627 \u0628\u0627\u0632\u06CC \u0642\u0641\u0644 \u0646\u06A9\u0646\u062F
             audioQueue = [];
             isAppending = false;
           });
@@ -680,18 +670,18 @@ function getFrontEndHTML() {
     function getCardLabel(card) {
       if(card.value === 'DRAW_2') return '+2';
       if(card.value === 'DRAW_4') return '+4';
-      if(card.value === 'REVERSE') return '🔄';
-      if(card.value === 'SKIP') return '🚫';
-      if(card.value === 'WILD') return '🎨';
+      if(card.value === 'REVERSE') return '\u{1F504}';
+      if(card.value === 'SKIP') return '\u{1F6AB}';
+      if(card.value === 'WILD') return '\u{1F3A8}';
       return card.value;
     }
 
     function getCardColorName(color) {
-      if(color === 'RED') return 'قرمز';
-      if(color === 'BLUE') return 'آبی';
-      if(color === 'GREEN') return 'سبز';
-      if(color === 'YELLOW') return 'زرد';
-      return 'کارت ویژه';
+      if(color === 'RED') return '\u0642\u0631\u0645\u0632';
+      if(color === 'BLUE') return '\u0622\u0628\u06CC';
+      if(color === 'GREEN') return '\u0633\u0628\u0632';
+      if(color === 'YELLOW') return '\u0632\u0631\u062F';
+      return '\u06A9\u0627\u0631\u062A \u0648\u06CC\u0698\u0647';
     }
 
     function renderCard(card, onClick = null) {
@@ -709,14 +699,14 @@ function getFrontEndHTML() {
             echoCancellation: true, 
             noiseSuppression: true, 
             autoGainControl: true,
-            channelCount: 1, // تک کاناله کردن برای کاهش ۵۰ درصدی حجم دیتای صوتی
-            sampleRate: 16000 // بهینه‌سازی صدا برای گفتار
+            channelCount: 1, // \u062A\u06A9 \u06A9\u0627\u0646\u0627\u0644\u0647 \u06A9\u0631\u062F\u0646 \u0628\u0631\u0627\u06CC \u06A9\u0627\u0647\u0634 \u06F5\u06F0 \u062F\u0631\u0635\u062F\u06CC \u062D\u062C\u0645 \u062F\u06CC\u062A\u0627\u06CC \u0635\u0648\u062A\u06CC
+            sampleRate: 16000 // \u0628\u0647\u06CC\u0646\u0647\u200C\u0633\u0627\u0632\u06CC \u0635\u062F\u0627 \u0628\u0631\u0627\u06CC \u06AF\u0641\u062A\u0627\u0631
           } 
         });
         document.getElementById('voiceControls').classList.remove('hidden');
         setupPTTEvents();
       } catch(e) {
-        console.warn('دسترسی به میکروفون داده نشد یا پشتیبانی نمی‌شود.', e);
+        console.warn('\u062F\u0633\u062A\u0631\u0633\u06CC \u0628\u0647 \u0645\u06CC\u06A9\u0631\u0648\u0641\u0648\u0646 \u062F\u0627\u062F\u0647 \u0646\u0634\u062F \u06CC\u0627 \u067E\u0634\u062A\u06CC\u0628\u0627\u0646\u06CC \u0646\u0645\u06CC\u200C\u0634\u0648\u062F.', e);
       }
     }
 
@@ -728,7 +718,7 @@ function getFrontEndHTML() {
         if (!audioStream || (mediaRecorder && mediaRecorder.state === "recording")) return;
         btn.classList.add('talking');
         
-        // ارسال چنک‌ها با فرمت فشرده‌تر
+        // \u0627\u0631\u0633\u0627\u0644 \u0686\u0646\u06A9\u200C\u0647\u0627 \u0628\u0627 \u0641\u0631\u0645\u062A \u0641\u0634\u0631\u062F\u0647\u200C\u062A\u0631
         mediaRecorder = new MediaRecorder(audioStream, { 
           mimeType: 'audio/webm;codecs=opus',
           audioBitsPerSecond: 16000 
@@ -740,7 +730,7 @@ function getFrontEndHTML() {
             ws.send(arrayBuffer);
           }
         };
-        // تایمر ۵۰۰ میلی‌ثانیه: صدای بسیار پایدارتر و رسش مطمئن به مقصد
+        // \u062A\u0627\u06CC\u0645\u0631 \u06F5\u06F0\u06F0 \u0645\u06CC\u0644\u06CC\u200C\u062B\u0627\u0646\u06CC\u0647: \u0635\u062F\u0627\u06CC \u0628\u0633\u06CC\u0627\u0631 \u067E\u0627\u06CC\u062F\u0627\u0631\u062A\u0631 \u0648 \u0631\u0633\u0634 \u0645\u0637\u0645\u0626\u0646 \u0628\u0647 \u0645\u0642\u0635\u062F
         mediaRecorder.start(500);
       };
 
@@ -760,7 +750,7 @@ function getFrontEndHTML() {
     }
 
     async function connect() {
-      const name = document.getElementById('nameInput').value || 'بازیکن';
+      const name = document.getElementById('nameInput').value || '\u0628\u0627\u0632\u06CC\u06A9\u0646';
       const room = document.getElementById('roomInput').value || 'UNO1';
       document.getElementById('roomCodeDisplay').innerText = room;
       
@@ -770,14 +760,14 @@ function getFrontEndHTML() {
 
       ws.onmessage = async (event) => {
         if (event.data instanceof ArrayBuffer) {
-          playReceivedAudio(event.data, "بازیکن");
+          playReceivedAudio(event.data, "\u0628\u0627\u0632\u06CC\u06A9\u0646");
           return;
         }
 
         const data = JSON.parse(event.data);
         
         if(data.type === "ROOM_CLOSED") {
-           alert("اتاق توسط میزبان بسته شد.");
+           alert("\u0627\u062A\u0627\u0642 \u062A\u0648\u0633\u0637 \u0645\u06CC\u0632\u0628\u0627\u0646 \u0628\u0633\u062A\u0647 \u0634\u062F.");
            location.reload();
         }
         if(data.type === "DRAWN_CARDS_NOTIFICATION") {
@@ -799,7 +789,7 @@ function getFrontEndHTML() {
 
     function showDrawnCardsNotification(cards) {
       if (!cards || cards.length === 0) return;
-      const names = cards.map(c => '[' + getCardColorName(c.color) + ' ' + getCardLabel(c) + ']').join(' ، ');
+      const names = cards.map(c => '[' + getCardColorName(c.color) + ' ' + getCardLabel(c) + ']').join(' \u060C ');
       const toast = document.getElementById('newCardToast');
       document.getElementById('newCardNames').innerText = names;
       toast.style.display = 'block';
@@ -846,7 +836,7 @@ function getFrontEndHTML() {
         document.getElementById('lobbyScreen').classList.remove('hidden');
         const list = document.getElementById('lobbyPlayers');
         list.innerHTML = '';
-        state.players.forEach(p => list.innerHTML += '<li class="player-badge">👤 ' + p.name + ' ' + (p.isHost ? '👑' : '') + '</li>');
+        state.players.forEach(p => list.innerHTML += '<li class="player-badge">\u{1F464} ' + p.name + ' ' + (p.isHost ? '\u{1F451}' : '') + '</li>');
       } 
       else if (state.status === "PLAYING") {
         document.getElementById('gameScreen').classList.remove('hidden');
@@ -854,23 +844,23 @@ function getFrontEndHTML() {
         const pList = document.getElementById('gamePlayers');
         pList.innerHTML = '';
         state.players.forEach(p => {
-          let extra = p.hasFinished ? ' (تمام🏆)' : ' (' + p.cardCount + ' کارت)';
+          let extra = p.hasFinished ? ' (\u062A\u0645\u0627\u0645\u{1F3C6})' : ' (' + p.cardCount + ' \u06A9\u0627\u0631\u062A)';
           let cssClass = (p.id === state.currentTurnId) ? 'player-badge active-turn' : 'player-badge';
-          pList.innerHTML += '<li class="' + cssClass + '">' + (p.isHost ? '👑' : '') + ' ' + p.name + extra + '</li>';
+          pList.innerHTML += '<li class="' + cssClass + '">' + (p.isHost ? '\u{1F451}' : '') + ' ' + p.name + extra + '</li>';
         });
 
         document.getElementById('topCardArea').innerHTML = '';
         if(state.topCard) document.getElementById('topCardArea').appendChild(renderCard(state.topCard));
         
         const cColor = document.getElementById('currentColorInfo');
-        const colorFa = state.currentColor==='RED'?'قرمز':state.currentColor==='BLUE'?'آبی':state.currentColor==='GREEN'?'سبز':'زرد';
-        cColor.innerText = 'رنگ: ' + colorFa;
+        const colorFa = state.currentColor==='RED'?'\u0642\u0631\u0645\u0632':state.currentColor==='BLUE'?'\u0622\u0628\u06CC':state.currentColor==='GREEN'?'\u0633\u0628\u0632':'\u0632\u0631\u062F';
+        cColor.innerText = '\u0631\u0646\u06AF: ' + colorFa;
         cColor.style.backgroundColor = state.currentColor==='RED'?'#ff4757':state.currentColor==='BLUE'?'#1e90ff':state.currentColor==='GREEN'?'#2ed573':'#ffa502';
         
-        document.getElementById('directionInfo').innerText = state.direction === 1 ? '🔄 ساعت‌گرد' : '🔃 پادساعت‌گرد';
+        document.getElementById('directionInfo').innerText = state.direction === 1 ? '\u{1F504} \u0633\u0627\u0639\u062A\u200C\u06AF\u0631\u062F' : '\u{1F503} \u067E\u0627\u062F\u0633\u0627\u0639\u062A\u200C\u06AF\u0631\u062F';
         
         const pAlert = document.getElementById('penaltyAlert');
-        if(state.penaltyStack > 0) pAlert.innerText = '⚠️ جریمه انباشته: ' + state.penaltyStack + ' کارت!';
+        if(state.penaltyStack > 0) pAlert.innerText = '\u26A0\uFE0F \u062C\u0631\u06CC\u0645\u0647 \u0627\u0646\u0628\u0627\u0634\u062A\u0647: ' + state.penaltyStack + ' \u06A9\u0627\u0631\u062A!';
         else pAlert.innerText = '';
 
         const handDiv = document.getElementById('myHandArea');
@@ -884,7 +874,7 @@ function getFrontEndHTML() {
         });
 
         const dBtn = document.getElementById('drawBtn');
-        dBtn.innerText = state.penaltyStack > 0 ? ('کشیدن ' + state.penaltyStack + ' کارت جریمه') : 'یک کارت بکش 🎴';
+        dBtn.innerText = state.penaltyStack > 0 ? ('\u06A9\u0634\u06CC\u062F\u0646 ' + state.penaltyStack + ' \u06A9\u0627\u0631\u062A \u062C\u0631\u06CC\u0645\u0647') : '\u06CC\u06A9 \u06A9\u0627\u0631\u062A \u0628\u06A9\u0634 \u{1F3B4}';
         dBtn.style.display = myTurn ? 'block' : 'none';
       }
       else if (state.status === "ENDED") {
@@ -892,13 +882,19 @@ function getFrontEndHTML() {
         const rArea = document.getElementById('rankingsArea');
         rArea.innerHTML = '';
         state.rankings.forEach((p, index) => {
-          let medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '🎖️';
-          rArea.innerHTML += '<div>' + medal + ' مقام ' + (index + 1) + ': ' + p.name + '</div>';
+          let medal = index === 0 ? '\u{1F947}' : index === 1 ? '\u{1F948}' : index === 2 ? '\u{1F949}' : '\u{1F396}\uFE0F';
+          rArea.innerHTML += '<div>' + medal + ' \u0645\u0642\u0627\u0645 ' + (index + 1) + ': ' + p.name + '</div>';
         });
       }
     }
-  </script>
+  <\/script>
 
 </body>
 </html>`;
 }
+__name(getFrontEndHTML, "getFrontEndHTML");
+export {
+  MyDurableObject,
+  index_default as default
+};
+//# sourceMappingURL=index.js.map
