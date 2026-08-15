@@ -1,7 +1,11 @@
 you need: cloudflare account😅, durable object
+
 this project has a built in voice chat which doesnt need server (actually its based on cloudflare )
+
 edit the class (line 18-22) to your own durable object
+
 tutorial: how to set up a durable object , if you are new to durable object just press "deploy to cloudflar" (written by cloudflare)
+
 # Durable Objects Starter
 
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/cloudflare/templates/tree/main/hello-world-do-template)
